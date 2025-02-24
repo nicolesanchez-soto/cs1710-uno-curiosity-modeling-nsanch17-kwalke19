@@ -1,4 +1,4 @@
-#lang forge
+#lang forge/froglet
 
 -------------------------------------------------------------------------------
 -- UNO is a multi-player card game where the goal is to be the first player   --
