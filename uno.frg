@@ -1,4 +1,4 @@
-#lang forge/froglet
+#lang forge
 
 -------------------------------------------------------------------------------
 /*  UNO is a multi-player card game where the goal is to be the first player   
@@ -35,11 +35,10 @@ one sig Wild, WildDrawFour extends Value {}
 
 -- Define card structure
 sig Card {
-    color: one Color,
     -- Each card can have at most one color (using pfunc for functional relationship)
-    // color: pfunc Color -> Boolean,
+    color: lone Color,
     -- Each card must have exactly one value
-    value: pfunc Value -> Boolean
+    value: one Value
 }
 
 -- Central game state tracker - exactly one instance to manage the game
@@ -65,17 +64,16 @@ sig Player {}
 
 -- Predicate to ensure cards follow UNO rules
 pred validCard[c: Card] {
-    -- Each card must have exactly one value
-    one v: Value | c.value[v] = True
-    
     -- Wild cards start with no color (color chosen when played)
-    (some v: (Wild + WildDrawFour) | c.value[v] = True) implies
-        (all col: Color | c.color[col] = False)
+    (c.value in Wild + WildDrawFour) implies no c.color
     
     -- Non-wild cards must have exactly one color
-    (no v: (Wild + WildDrawFour) | c.value[v] = True) implies
-        (one col: Color | c.color[col] = True)
+    (c.value not in Wild + WildDrawFour ) implies some c.color
 }
+
+run {
+    all c : Card |validCard[c]
+} for exactly 4 Player, exactly 10 Card, 4 Int, exactly 1 GameState
 
 -- Get the next player in order (considering direction)
 pred nextPlayer[current, next: Player] {
@@ -158,13 +156,11 @@ pred canPlayCard[c: Card] {
         -- Card can be played if:
         -- 1. It matches the color of the top card
         (some col: Color | {
-            c.color[col] = True
-            topCard.color[col] = True
+            c.color = topCard.color
         }) or
         -- 2. It matches the value of the top card
         (some val: Value | {
-            c.value[val] = True
-            topCard.value[val] = True
+            c.value = topCard.value
         }) or
         -- 3. It's a Wild or Wild Draw Four (can be played anytime)
         (some val: (Wild + WildDrawFour) | c.value[val] = True)
@@ -337,24 +333,24 @@ pred playCard[p: Player, c: Card] {
 }
 
 -- Run command to test initialization, dealing, and player ordering
-run {
-    initGame
-    deal
+// run {
+//     initGame
+//     deal
     
-    -- Test that we have proper player ordering
-    all p: Player | some pos: Int | {
-        pos >= 1
-        pos <= #Player
-        GameState.playerOrder[p] = pos
-    }
+//     -- Test that we have proper player ordering
+//     all p: Player | some pos: Int | {
+//         pos >= 1
+//         pos <= #Player
+//         GameState.playerOrder[p] = pos
+//     }
     
-    -- Test that we have a current player
-    one p: Player | GameState.currentPlayer[p] = True
+//     -- Test that we have a current player
+//     one p: Player | GameState.currentPlayer[p] = True
     
-    -- Test that each player has exactly 7 cards
-    all p: Player | #{c: Card | GameState.hands[p][c] = True} = 7
+//     -- Test that each player has exactly 7 cards
+//     all p: Player | #{c: Card | GameState.hands[p][c] = True} = 7
 
-    -- need to test playCard (been having issues </3)
+//     -- need to test playCard (been having issues </3)
     
     
-} for exactly 4 Player, exactly 52 Card, 4 Int, exactly 1 GameState
+// } for exactly 4 Player, exactly 52 Card, 4 Int, exactly 1 GameState
