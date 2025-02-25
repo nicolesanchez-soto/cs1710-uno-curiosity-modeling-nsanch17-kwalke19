@@ -1,20 +1,20 @@
 #lang forge/froglet
 
 -------------------------------------------------------------------------------
--- UNO is a multi-player card game where the goal is to be the first player   --
--- to get rid of all your cards. Players take turns playing cards from their  --
--- hand that match either the color or number of the card on top of the       --
--- discard pile. The game includes number cards (0-9) in four colors (red,    --
--- blue, green, yellow), as well as special action cards like Skip, Reverse,  --
--- and Draw Two that affect gameplay. Wild cards can be played at any time    --
--- and allow the player to choose a new color. Wild Draw Four cards combine   --
--- this color-changing ability with forcing the next player to draw four      --
--- cards. Players must call "UNO" when they have one card left or face a      --
--- penalty. The game continues until a player has successfully played all      --
--- their cards.                                                               --
+/*  UNO is a multi-player card game where the goal is to be the first player   
+    to get rid of all your cards. Players take turns playing cards from their  
+    hand that match either the color or number of the card on top of the       
+    discard pile. The game includes number cards (0-9) in four colors (red,    
+    blue, green, yellow), as well as special action cards like Skip, Reverse,  
+    and Draw Two that affect gameplay. Wild cards can be played at any time    
+    and allow the player to choose a new color. Wild Draw Four cards combine   
+    this color-changing ability with forcing the next player to draw four      
+    cards. Players must call "UNO" when they have one card left or face a      
+    penalty. The game continues until a player has successfully played all      
+    their cards.                                      
+*/                     
 -------------------------------------------------------------------------------
 
--- Define Boolean values for our functional relationships
 abstract sig Boolean {}
 -- Exactly one instance each of True and False
 one sig True, False extends Boolean {}
@@ -35,8 +35,9 @@ one sig Wild, WildDrawFour extends Value {}
 
 -- Define card structure
 sig Card {
+    color: one Color,
     -- Each card can have at most one color (using pfunc for functional relationship)
-    color: pfunc Color -> Boolean,
+    // color: pfunc Color -> Boolean,
     -- Each card must have exactly one value
     value: pfunc Value -> Boolean
 }
