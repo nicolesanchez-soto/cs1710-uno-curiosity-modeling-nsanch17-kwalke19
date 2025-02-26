@@ -372,12 +372,11 @@ pred playCard[m1, m2: Move, p: Player, c: Card] {
 
 -- Run command to test initialization, dealing, and player ordering
 run {
-    -- 1) Choose an initial move m0 (the start state)
+
     some m0: Move | {
-        initGame[m0]        -- sets direction, positions, etc., at m0
-        deal[m0]            -- ensures each player has 7 cards at m0
-        
-        -- 2) Test constraints on the initial state m0
+        initGame[m0]     
+        deal[m0]           
+   
         -- Test that we have proper player ordering
         all p: Player | some pos: Int | {
             pos >= 1
