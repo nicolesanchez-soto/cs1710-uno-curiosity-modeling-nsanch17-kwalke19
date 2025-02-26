@@ -250,6 +250,7 @@ pred moveNextPlayer[p: Player, m1, m2: Move]{
     }
 }
 
+// TODO: add more helpers
 pred playCard[m1, m2: Move, p: Player, c: Card] {
     m1.next = m2
 
@@ -258,7 +259,7 @@ pred playCard[m1, m2: Move, p: Player, c: Card] {
     -- Card must be in player's hand
     GameState.hands[m1][p][c] = True
     -- Card must be legally playable
-    // canPlayCard[m1][c]
+    canPlayCard[m1, c]
     
     -- Find the current top card index and add this card at the next index
     some i: Int | {
