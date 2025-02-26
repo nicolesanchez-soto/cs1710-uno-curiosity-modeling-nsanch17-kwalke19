@@ -41,6 +41,7 @@ one sig Wild, WildDrawFour extends Value {}
 sig Card {
     -- Each card can have at most one color 
     color: lone Color,
+    // TODO: add move here so wildcard can change it?
     -- Each card must have exactly one value
     value: one Value
 }
