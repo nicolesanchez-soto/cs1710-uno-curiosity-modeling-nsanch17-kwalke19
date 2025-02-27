@@ -15,194 +15,200 @@
 */                     
 -------------------------------------------------------------------------------
 
+// Boolean signature for True/False values across the model
 abstract sig Boolean {}
--- Exactly one instance each of True and False
+// Exactly one instance each of True and False
 one sig True, False extends Boolean {}
 
--- Represents state at certain player move
+// Move signature represents game state at a specific player's turn
 sig Move {
+    // Optional reference to the next move in sequence (may not exist if game ends)
     next: lone Move
 }
--- Define the three UNO card colors
+
+// Color signature defines the UNO card colors
 abstract sig Color {}
--- Exactly one instance of each color in the game
+// Note: Simplified to 3 colors (missing Yellow) to reduce model complexity
 one sig Red, Blue, Green extends Color {}
 
--- Define all possible card values in UNO
+// Value signature defines all possible card values in UNO
 abstract sig Value {}
--- Number cards from 0-2, exactly one instance of each
+// Simplified number cards (only 0-2 instead of 0-9)
 one sig Zero, One, Two extends Value {}
--- Action cards - Skip (skip next player),  Draw Two (next player draws 2)
+// Action cards - simplified to only include Skip and DrawTwo
 one sig Skip, DrawTwo extends Value {}
--- Wild cards - Wild (change color), Wild Draw Four (change color + next player draws 4)
+// Wild cards - both types included
 one sig Wild, WildDrawFour extends Value {}
 
--- Define card structure
+// Card signature defines structure of UNO cards
 sig Card {
-    -- Each card can have at most one color 
+    // Optional color - Wild cards don't have predefined colors
     color: lone Color,
-    -- Each card must have exactly one value
+    // Every card must have a value
     value: one Value
 }
 
--- Central game state tracker - exactly one instance to manage the game
+// Central game state tracker - manages all aspects of the game
 one sig GameState {
-    -- Track which cards are currently in the deck
+    // Track which cards are in the deck at each move (partial function mapping)
     deck: pfunc Move -> Card -> Boolean,
-    -- Track order of cards in discard pile using integers
+    // Track discard pile ordering with integer indices
     discard: pfunc Move -> Int -> Card,
-    -- Track whose turn it is
+    // Track which player's turn it is
     currentPlayer: pfunc Move -> Player -> Boolean,
-    -- Track active players in the game
+    // Track which players are active in the game
     players: pfunc Move-> Player -> Boolean,
-    -- Track which cards are in each player's hand
+    // Track which cards are in each player's hand
     hands: pfunc Move -> Player -> Card -> Boolean,
-    -- Updated by WildCard color selection
+    // Track color chosen when wild cards are played
     chosenColor: pfunc Move -> Card -> Color,
-    -- Helps track what action is next to reduce overload
+    // Track pending actions (from action cards)
     pendingAction: pfunc Move -> Value
 }
 
--- Player representation
+// Player signature represents game participants
 sig Player {}
 
--- Predicate to ensure cards follow UNO rules
+// Predicate to ensure cards follow UNO rules
 pred validCard[c: Card] {
-    -- Wild cards start with no color (color chosen when played)
+    // Wild cards should have no color initially (color chosen when played)
     (c.value in Wild + WildDrawFour) implies no c.color
-    -- Non-wild cards must have exactly one color
+    // Non-wild cards must have exactly one color
     (c.value not in Wild + WildDrawFour ) implies some c.color
 }
 
--- Limits the frequency of each card type - reduced the official game for efficiency
+// Controls card distribution in the game - simplified for performance
 pred validCardSpread{
-    -- One of each number per color
+    // One of each number card per color (instead of two in real UNO)
     all val: Zero + One + Two, c : Color |{
         #{card: Card | card.value = val and card.color = c} = 1
     } 
 
-    -- One of each action type per color
+    // One of each action card per color (instead of two in real UNO)
     all v: Skip + DrawTwo, c: Color |
         #{card: Card | card.value = v and card.color = c} = 1 
  
-    -- 2 Of each wild card
+    // Only 2 Wild cards of each type (instead of 4 in real UNO)
     #{card: Card | card.value = Wild} = 2
     #{card: Card | card.value = WildDrawFour} = 2
-
 }
 
--- Initialize a new game state
+// Initialize a new game state
 pred initGame[m0: Move] {
-    -- Ensure all cards in play are valid UNO cards
+    // Ensure all cards follow UNO rules
     all c: Card | validCard[c]
     
-    -- Discard pile starts empty
+    // Discard pile starts empty
     all i: Int, c: Card | no GameState.discard[m0][i]
 
-    -- Set first player (player with position 1) as current
+    // Set first player as current (single player marked True)
     one p: Player | {
         GameState.currentPlayer[m0][p] = True
     }
 
-    -- Pending action comes from pulling action card
+    // No pending actions at start
     no GameState.pendingAction[m0]
 }
 
--- Deal initial cards to players
+// Deal initial cards to players
 pred deal[m: Move] {
+    // Ensure cards are distributed correctly per rules
     validCardSpread
-    -- Each player should have exactly 7 cards at move m
+    
+    // Each player starts with exactly 7 cards
     all p: Player |
         #{ c: Card | GameState.hands[m][p][c] = True } = 7
     
-    -- A card can only be in one place (either deck or one player's hand) at move m
+    // Cards can only be in one place (deck or a player's hand)
     all c: Card | {
         (GameState.deck[m][c] = True) iff (all p: Player | GameState.hands[m][p][c] = False)
     }
 
-    -- Cards are either in deck or in a player's hand at move m
+    // All cards must be somewhere (deck or player hand)
     all c: Card | {
         GameState.deck[m][c] = True 
         or (one p: Player | GameState.hands[m][p][c] = True)
     }
-    -- No cards in the discard pile yet at move m
+    
+    // Discard pile is empty at start
     all i: Int | no GameState.discard[m][i]
 }
 
--- Predicate to check if a card can be legally played
+// Check if a card can be legally played
 pred canPlayCard[m: Move, c: Card] {
 
-    -- With no topcard, pick any 
+    // First card case: Any card can be played if discard pile is empty
     (no i: Int | some GameState.discard[m][i])
 
     or
 
-    -- Get the top card of the discard pile (highest index)
+    // Normal play case: Card must match top card in some way
     (some topCard: Card | {
-        -- Find the highest index in the discard pile
+        // Find the top card (highest index in discard pile)
         some i: Int | {
             GameState.discard[m][i] = topCard
-            -- Ensure no higher index exists
+            // Ensure it's truly the top card
             no j: Int | j > i and some GameState.discard[m][j]
         }
         
-        -- Card can be played if:
-        -- Wild and matches chosen color
+        // Legal play conditions:
+        // 1. If top card is Wild, new card must match chosen color
         (topCard.value in Wild + WildDrawFour and GameState.chosenColor[m][topCard] = c.color) or
-        -- It matches the color of the top card (non-wild)
-        ( topCard.value not in Wild + WildDrawFour and c.color = topCard.color) or
-        -- It matches the value of the top card
+        // 2. Card matches color of top card (for non-wild top cards)
+        (topCard.value not in Wild + WildDrawFour and c.color = topCard.color) or
+        // 3. Card matches value of top card
         (c.value = topCard.value) or
-        -- It's a Wild or Wild Draw Four (can be played anytime)
+        // 4. Card is Wild (can be played anytime)
         (c.value in Wild + WildDrawFour)
     })
 }
 
--- Predicate to draw a card from the deck
+// Draw a card from the deck
 pred drawCard[p: Player, m1, m2: Move] {
     some c: Card | {
-        -- Card must be in the deck before drawing
+        // Card must be in deck before drawing
         GameState.deck[m1][c] = True
 
-        -- After drawing:
-        -- 1. Card is removed from deck
+        // After drawing:
+        // Move card from deck to player's hand
         GameState.deck[m2][c] = False
-        -- 2. Card is added to player's hand
         GameState.hands[m2][p][c] = True
         
-        -- Only this card moves (all other cards stay where they are)
+        // Other cards remain unchanged
         all otherCard: Card - c | {
-            -- Other cards in deck stay in deck
+            // Deck status preserved for other cards
             GameState.deck[m2][otherCard] = GameState.deck[m1][otherCard]
-            -- Other cards in hands stay in their hands
+            // Hand status preserved for other cards
             all otherPlayer: Player | {
                 GameState.hands[m2][otherPlayer][otherCard] = GameState.hands[m1][otherPlayer][otherCard]
             }
         }
         
-        -- Discard pile remains unchanged
+        // Discard pile remains unchanged
         all i: Int | {
             GameState.discard[m2][i] = GameState.discard[m1][i]
         }
     }
 }
 
-
+// Helper predicate to add a card to player's hand
 pred addToHand[p: Player, c: Card, m1, m2 : Move]{
-    -- Remove from deck at next state, add to player hand
+    // Move card from deck to player's hand
     GameState.deck[m1][c] = True
     GameState.hands[m2][p][c] = True
     GameState.deck[m2][c] = False
 }
 
--- defined in terms of 2-person game - person retains turn
-pred skipOver[p: Player,skipPlayer: Player, m1, m2: Move]{
+// Skip next player's turn (simplified for 2-player game)
+pred skipOver[p: Player, skipPlayer: Player, m1, m2: Move]{
+    // In 2-player game, skipping means current player gets another turn
     GameState.currentPlayer[m2][p] = True
 }                                                         
 
--- swapping turns for 2 people
+// Move to next player (simplified for 2-player game)
 pred moveNextPlayer[p: Player, m1, m2: Move]{
     m1.next = m2
+    // Find other player and make them current
     some other: Player | { 
         other != p 
         GameState.currentPlayer[m2][other] = True
@@ -210,63 +216,64 @@ pred moveNextPlayer[p: Player, m1, m2: Move]{
     }
 }
 
--- Game ends entirely if a player wins — different from actual game
+// Game ends when a player has no cards left
 pred gameOver{
-    -- If any player is out of cards, no move can follow
+    // No more moves possible after a player runs out of cards
     some m: Move | some p: Player | {
         #{c: Card | GameState.hands[m][p][c] = True} = 0
         no m.next}
 }
 
--- Color only chosen if a wild card
+// Ensure colors are only chosen for wild cards
 pred chosenColorForWildOnly {
     all m: Move, c: Card | {
         c.value not in Wild + WildDrawFour implies no GameState.chosenColor[m][c]
     }
 }
 
+// Play a card from hand
 pred playCard[m1, m2: Move, p: Player, c: Card] {
     m1.next = m2
-    -- Player must be the current player
+    // Player must be current player
     GameState.currentPlayer[m1][p] = True
-    -- Card must be legally playable
+    // Card must be playable per rules
     canPlayCard[m1, c]
-    -- Card must be in player's hand
+    // Card must be in player's hand
     GameState.hands[m1][p][c] = True
-    -- Remove card from player's hand
+    // Remove card from player's hand
     GameState.hands[m2][p][c] = False
     
-    -- Find the current top card index and add this card at the next index
+    // Add card to discard pile at next index
     some i: Int | {
-        -- Find highest current index in discard pile
+        // Find current highest index
         some GameState.discard[m1][i]
         no j: Int | j > i and some GameState.discard[m1][j]
         
-        -- Add this card at the next index
+        // Add at next index
         GameState.discard[m2][add[i, 1]] = c
     } or {
-        -- Handle the case when discard pile is empty (first card played)
+        // Handle first card case (empty discard pile)
         (all j: Int | no GameState.discard[m1][j])
         GameState.discard[m2][1] = c
     }
 
-    -- Set up pending for later pred if special
+    // Set pending action for special cards
     (c.value in Skip + DrawTwo + Wild + WildDrawFour)
       implies (GameState.pendingAction[m2] = c.value) else {
         no GameState.pendingAction[m2]
     }
  
-    -- Card locations remain unchanged for all other cards
+    // Keep other cards unchanged
     all otherCard: Card - c | {
-        -- Cards in deck stay in deck
+        // Deck remains the same
         GameState.deck[m1][otherCard] = GameState.deck[m2][otherCard]
-        -- Cards in hands stay in their hands
+        // Player hands remain the same
         all player: Player | {
             GameState.hands[m1][player][otherCard] = GameState.hands[m2][player][otherCard]
         }
     }
     
-    -- Positions in discard pile remain unchanged except for the new card
+    // Discard pile unchanged except for new card
     all idx: Int | all discardCard: Card | {
         (GameState.discard[m1][idx] = discardCard and discardCard != c) implies 
             GameState.discard[m2][idx] = discardCard
@@ -274,10 +281,12 @@ pred playCard[m1, m2: Move, p: Player, c: Card] {
     
 }
 
+// Handle effects of action cards
 pred resolveAction[m1, m2: Move, c: Card, p: Player] {
   some val: Value | {
     GameState.pendingAction[m1] = val
 
+    // Dispatch to appropriate action handler
     (val = Skip) implies { some p: Player | skipAction[m1, m2, p] } else
     (val = DrawTwo) implies { some p: Player | drawTwoAction[m1, m2, p] } else
     (val = Wild) implies { some p: Player | wildAction[m1, m2, c, p] } else
@@ -286,123 +295,139 @@ pred resolveAction[m1, m2: Move, c: Card, p: Player] {
   }
 }
 
+// Handle Skip card action
 pred skipAction[m1, m2: Move, p: Player] {
     m1.next = m2
     
-    -- skip the next player
+    // Current player gets another turn (skip next player)
     GameState.currentPlayer[m2][p] = True
     some q: Player | {
         q != p 
         GameState.currentPlayer[m2][q] = False}
 
-    -- remove pendingAction
+    // Clear pending action
     no GameState.pendingAction[m2]
 }
 
+// Handle Draw Two card action
 pred drawTwoAction[m1, m2: Move, p: Player] {
     m1.next = m2
 
     some other: Player | { 
         other != p 
 
-    some c1, c2: Card | {
-        c1 != c2
-        addToHand[p, c1, m1, m2]
-        addToHand[p, c2, m1, m2]
+        // Other player draws two cards
+        some c1, c2: Card | {
+            c1 != c2
+            addToHand[p, c1, m1, m2]
+            addToHand[p, c2, m1, m2]
+        }
+
+        // Current player keeps turn
+        GameState.currentPlayer[m2][p] = True
+        GameState.currentPlayer[m2][other] = False
     }
 
-    GameState.currentPlayer[m2][p] = True
-    GameState.currentPlayer[m2][other] = False}
-
+    // Clear pending action
     no GameState.pendingAction[m2]
 }
 
+// Handle Wild card action
 pred wildAction[m1, m2: Move, c: Card, p: Player] {
     m1.next = m2
-    -- Choose a color
+    // Player chooses a color
     some col: Color | {
        GameState.chosenColor[m2][c] = col
     }
+    // Move to next player
     moveNextPlayer[p, m1, m2] 
-    -- Clear pending action
+    // Clear pending action
     no GameState.pendingAction[m2]
 }
 
+// Handle Wild Draw Four card action
 pred wildDrawFourAction[m1, m2: Move, p: Player, c: Card] {
     m1.next = m2
 
-    -- Other player draws
+    // Other player draws four cards
     some other: Player | { 
         other != p 
         some c1, c2, c3, c4: Card | {
+            // Ensure all cards are different
             c1 != c2 and c1 != c3 and c1 != c4
             c2 != c3 and c2 != c4
             c3 != c4
         
+            // Add four cards to other player's hand
             addToHand[p, c1, m1, m2]
             addToHand[p, c2, m1, m2]
             addToHand[p, c3, m1, m2]
             addToHand[p, c4, m1, m2]
-
-    }   
-    -- Skip other player
+        }   
+        // Skip other player's turn
         GameState.currentPlayer[m2][p] = True
         GameState.currentPlayer[m2][other] = False
     }
-    -- choose color
+    // Choose new color
     some col: Color | {
        GameState.chosenColor[m2][c] = col
     }
 
+    // Clear pending action
     no GameState.pendingAction[m2]
 }
 
+// Player's turn logic
 pred playerTurn[m1, m2: Move, p: Player] {
   some c: Card | { 
+        // Play a card if possible, otherwise draw
         (GameState.hands[m1][p][c] = True and canPlayCard[m1, c]) implies playCard[m1, m2, p, c] 
         else {drawCard[p, m1, m2]}
     }
 }
 
-
+// Define a short game trace (3 turns)
 pred gameTrace {
   chosenColorForWildOnly
   some m0, m1, m2, m3, m4, m5: Move,
        p0, p1: Player,
        c0, c1: Card |
   {
+    // Initial setup
     initGame[m0]
     deal[m0]
 
-    -- Move 1
+    // First player's turn
     playerTurn[m0, m1, p0]
     moveNextPlayer[p0, m1, m2]
 
-    -- Move 2
+    // Second player's turn
     playerTurn[m2, m3, p1]
     moveNextPlayer[p1, m3, m4]
 
-    -- Move 3
+    // First player's second turn
     playerTurn[m4, m5, p0]
     gameOver
   }
 }
 
-run {gameTrace} for exactly 2 Player, exactly 19 Card, 4 Int, exactly 1 GameState, 6 Move for {next is linear}
+// // Run the short game trace
+// run {gameTrace} for exactly 2 Player, exactly 19 Card, 4 Int, exactly 1 GameState, 6 Move for {next is linear}
 
-
-// run {
-//   chosenColorForWildOnly
-//   some m0: Move | {
-//     initGame[m0]
-//     deal[m0]
-//     some m1: Move, p: Player, c: Card | {
-//       playCard[m0, m1, p, c]
-//       some m2: Move | {
-//          (GameState.pendingAction[m1] in (Skip + DrawTwo + Wild + WildDrawFour))
-//            implies resolveAction[m1, m2, c, p] else moveNextPlayer[p, m1, m2]
-//       }
-//     }
-//   }
-//   gameOver
-// } for exactly 2 Player, exactly 19 Card, 4 Int, exactly 1 GameState, 6 Move for {next is linear}
+// Run a more flexible game that focuses on action card effects
+run {
+  chosenColorForWildOnly
+  some m0: Move | {
+    initGame[m0]
+    deal[m0]
+    some m1: Move, p: Player, c: Card | {
+      playCard[m0, m1, p, c]
+      some m2: Move | {
+         // If action card was played, resolve its effect, otherwise move to next player
+         (GameState.pendingAction[m1] in (Skip + DrawTwo + Wild + WildDrawFour))
+           implies resolveAction[m1, m2, c, p] else moveNextPlayer[p, m1, m2]
+      }
+    }
+  }
+  gameOver
+} for exactly 2 Player, exactly 19 Card, 4 Int, exactly 1 GameState, 6 Move for {next is linear}
