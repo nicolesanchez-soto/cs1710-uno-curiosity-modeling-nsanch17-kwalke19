@@ -159,36 +159,40 @@ pred canPlayCard[m: Move, c: Card] {
 }
 
 -- Predicate to draw a card from the deck
-pred drawCard[p: Player, c: Card, m1, m2: Move] {
-    -- Card must be in the deck before drawing
-    GameState.deck[m1][c] = True
+pred drawCard[p: Player, m1, m2: Move] {
+    some c: Card | {
+        -- Card must be in the deck before drawing
+        GameState.deck[m1][c] = True
 
-    -- After drawing:
-    -- 1. Card is removed from deck
-    GameState.deck[m2][c] = False
-    -- 2. Card is added to player's hand
-    GameState.hands[m2][p][c] = True
-    
-    -- Only this card moves (all other cards stay where they are)
-    all otherCard: Card - c | {
-        -- Other cards in deck stay in deck
-        GameState.deck[m2][otherCard] = GameState.deck[m1][otherCard]
-        -- Other cards in hands stay in their hands
-        all otherPlayer: Player | {
-            GameState.hands[m2][otherPlayer][otherCard] = GameState.hands[m1][otherPlayer][otherCard]
+        -- After drawing:
+        -- 1. Card is removed from deck
+        GameState.deck[m2][c] = False
+        -- 2. Card is added to player's hand
+        GameState.hands[m2][p][c] = True
+        
+        -- Only this card moves (all other cards stay where they are)
+        all otherCard: Card - c | {
+            -- Other cards in deck stay in deck
+            GameState.deck[m2][otherCard] = GameState.deck[m1][otherCard]
+            -- Other cards in hands stay in their hands
+            all otherPlayer: Player | {
+                GameState.hands[m2][otherPlayer][otherCard] = GameState.hands[m1][otherPlayer][otherCard]
+            }
         }
-    }
-    
-    -- Discard pile remains unchanged
-    all i: Int | {
-        GameState.discard[m2][i] = GameState.discard[m1][i]
+        
+        -- Discard pile remains unchanged
+        all i: Int | {
+            GameState.discard[m2][i] = GameState.discard[m1][i]
+        }
     }
 }
 
-// TODO: use this helper for draws 
-pred addToHand[p: Player, c: Card]{
-    GameState.deck[c] = False
-    GameState.hands[p][c] = True
+
+pred addToHand[p: Player, c: Card, m1, m2 : Move]{
+    -- Remove from deck at next state, add to player hand
+    GameState.deck[m1][c] = True
+    GameState.hands[m2][p][c] = True
+    GameState.deck[m2][c] = False
 }
 
 -- defined in terms of 2-person game - person retains turn
@@ -199,9 +203,11 @@ pred skipOver[p: Player,skipPlayer: Player, m1, m2: Move]{
 -- swapping turns for 2 people
 pred moveNextPlayer[p: Player, m1, m2: Move]{
     m1.next = m2
-    some other: Player | { other != p 
-    GameState.currentPlayer[m2][other] = True
-    GameState.currentPlayer[m2][p] = False }
+    some other: Player | { 
+        other != p 
+        GameState.currentPlayer[m2][other] = True
+        GameState.currentPlayer[m2][p] = False 
+    }
 }
 
 -- Game ends entirely if a player wins — different from actual game
@@ -280,7 +286,6 @@ pred resolveAction[m1, m2: Move, c: Card, p: Player] {
   }
 }
 
-
 pred skipAction[m1, m2: Move, p: Player] {
     m1.next = m2
     
@@ -301,21 +306,15 @@ pred drawTwoAction[m1, m2: Move, p: Player] {
         other != p 
 
     some c1, c2: Card | {
-    c1 != c2
-    GameState.deck[m1][c1] = True
-    GameState.deck[m1][c2] = True
-    GameState.hands[m2][other][c1] = True
-    GameState.hands[m2][other][c2] = True
-    GameState.deck[m2][c1] = False
-    GameState.deck[m2][c2] = False
-  }
+        c1 != c2
+        addToHand[p, c1, m1, m2]
+        addToHand[p, c2, m1, m2]
+    }
 
     GameState.currentPlayer[m2][p] = True
     GameState.currentPlayer[m2][other] = False}
 
-    
     no GameState.pendingAction[m2]
-
 }
 
 pred wildAction[m1, m2: Move, c: Card, p: Player] {
@@ -332,27 +331,21 @@ pred wildAction[m1, m2: Move, c: Card, p: Player] {
 pred wildDrawFourAction[m1, m2: Move, p: Player, c: Card] {
     m1.next = m2
 
-    some other: Player | { other != p 
-    some c1, c2, c3, c4: Card | {
-       c1 != c2 and c1 != c3 and c1 != c4
-        c2 != c3 and c2 != c4
-        c3 != c4
+    -- Other player draws
+    some other: Player | { 
+        other != p 
+        some c1, c2, c3, c4: Card | {
+            c1 != c2 and c1 != c3 and c1 != c4
+            c2 != c3 and c2 != c4
+            c3 != c4
         
-        GameState.deck[m1][c1] = True
-        GameState.deck[m1][c2] = True
-        GameState.deck[m1][c3] = True
-        GameState.deck[m1][c4] = True
+            addToHand[p, c1, m1, m2]
+            addToHand[p, c2, m1, m2]
+            addToHand[p, c3, m1, m2]
+            addToHand[p, c4, m1, m2]
 
-        GameState.deck[m2][c1] = False
-        GameState.deck[m2][c2] = False
-        GameState.deck[m2][c3] = False
-        GameState.deck[m2][c4] = False
-
-        GameState.hands[m2][other][c1] = True
-        GameState.hands[m2][other][c2] = True
-        GameState.hands[m2][other][c3] = True
-        GameState.hands[m2][other][c4] = True
-    }
+    }   
+    -- Skip other player
         GameState.currentPlayer[m2][p] = True
         GameState.currentPlayer[m2][other] = False
     }
@@ -364,24 +357,33 @@ pred wildDrawFourAction[m1, m2: Move, p: Player, c: Card] {
     no GameState.pendingAction[m2]
 }
 
+pred playerTurn[m1, m2: Move, p: Player] {
+  some c: Card | { 
+        (GameState.hands[m1][p][c] = True and canPlayCard[m1, c]) implies playCard[m1, m2, p, c] 
+        else {drawCard[p, m1, m2]}
+    }
+}
+
+
 pred gameTrace {
+  chosenColorForWildOnly
   some m0, m1, m2, m3, m4, m5: Move,
        p0, p1: Player,
-       c0, c1, c2: Card |
+       c0, c1: Card |
   {
     initGame[m0]
     deal[m0]
 
     -- Move 1
-    playCard[m0, m1, p0, c0]
+    playerTurn[m0, m1, p0]
     moveNextPlayer[p0, m1, m2]
 
     -- Move 2
-    playCard[m2, m3, p1, c1]
+    playerTurn[m2, m3, p1]
     moveNextPlayer[p1, m3, m4]
 
     -- Move 3
-    playCard[m4, m5, p0, c2]
+    playerTurn[m4, m5, p0]
     gameOver
   }
 }
@@ -404,7 +406,3 @@ run {gameTrace} for exactly 2 Player, exactly 19 Card, 4 Int, exactly 1 GameStat
 //   }
 //   gameOver
 // } for exactly 2 Player, exactly 19 Card, 4 Int, exactly 1 GameState, 6 Move for {next is linear}
-
-
-
--- TODO: win/loss
