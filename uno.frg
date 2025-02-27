@@ -185,6 +185,7 @@ pred drawCard[p: Player, c: Card, m1, m2: Move] {
     }
 }
 
+// TODO: use this helper for draws 
 pred addToHand[p: Player, c: Card]{
     GameState.deck[c] = False
     GameState.hands[p][c] = True
@@ -279,24 +280,9 @@ pred resolveAction[m1, m2: Move, c: Card, p: Player] {
   }
 }
 
-pred frameUnchanged[m1, m2: Move] {
-    -- All conditions stay the same 
-    all c: Card | GameState.deck[m2][c] = GameState.deck[m1][c]
-
-    all p: Player, c: Card | GameState.hands[m2][p][c] = GameState.hands[m1][p][c]
- 
-    all i: Int | GameState.discard[m2][i] = GameState.discard[m1][i]
-   
-    GameState.pendingAction[m2] = GameState.pendingAction[m1]
-
-    all c: Card | GameState.chosenColor[m2][c] = GameState.chosenColor[m1][c]
-
-    all p: Player | GameState.currentPlayer[m2][p] = GameState.currentPlayer[m1][p]
-}
 
 pred skipAction[m1, m2: Move, p: Player] {
     m1.next = m2
-    frameUnchanged[m1,m2]
     
     -- skip the next player
     GameState.currentPlayer[m2][p] = True
@@ -314,7 +300,7 @@ pred drawTwoAction[m1, m2: Move, p: Player] {
     some other: Player | { 
         other != p 
 
-  some c1, c2: Card | {
+    some c1, c2: Card | {
     c1 != c2
     GameState.deck[m1][c1] = True
     GameState.deck[m1][c2] = True
@@ -328,7 +314,7 @@ pred drawTwoAction[m1, m2: Move, p: Player] {
     GameState.currentPlayer[m2][other] = False}
 
     
-  no GameState.pendingAction[m2]
+    no GameState.pendingAction[m2]
 
 }
 
@@ -367,8 +353,8 @@ pred wildDrawFourAction[m1, m2: Move, p: Player, c: Card] {
         GameState.hands[m2][other][c3] = True
         GameState.hands[m2][other][c4] = True
     }
-     GameState.currentPlayer[m2][p] = True
-    GameState.currentPlayer[m2][other] = False
+        GameState.currentPlayer[m2][p] = True
+        GameState.currentPlayer[m2][other] = False
     }
     -- choose color
     some col: Color | {
@@ -378,22 +364,46 @@ pred wildDrawFourAction[m1, m2: Move, p: Player, c: Card] {
     no GameState.pendingAction[m2]
 }
 
-
-run {
-  chosenColorForWildOnly
-  some m0: Move | {
+pred gameTrace {
+  some m0, m1, m2, m3, m4, m5: Move,
+       p0, p1: Player,
+       c0, c1, c2: Card |
+  {
     initGame[m0]
     deal[m0]
-    some m1: Move, p: Player, c: Card | {
-      playCard[m0, m1, p, c]
-      some m2: Move | {
-         (GameState.pendingAction[m1] in (Skip + DrawTwo + Wild + WildDrawFour))
-           implies resolveAction[m1, m2, c, p] else moveNextPlayer[p, m1, m2]
-      }
-    }
+
+    -- Move 1
+    playCard[m0, m1, p0, c0]
+    moveNextPlayer[p0, m1, m2]
+
+    -- Move 2
+    playCard[m2, m3, p1, c1]
+    moveNextPlayer[p1, m3, m4]
+
+    -- Move 3
+    playCard[m4, m5, p0, c2]
+    gameOver
   }
-  gameOver
-} for exactly 2 Player, exactly 19 Card, 4 Int, exactly 1 GameState, 6 Move for {next is linear}
+}
+
+run {gameTrace} for exactly 2 Player, exactly 19 Card, 4 Int, exactly 1 GameState, 6 Move for {next is linear}
+
+
+// run {
+//   chosenColorForWildOnly
+//   some m0: Move | {
+//     initGame[m0]
+//     deal[m0]
+//     some m1: Move, p: Player, c: Card | {
+//       playCard[m0, m1, p, c]
+//       some m2: Move | {
+//          (GameState.pendingAction[m1] in (Skip + DrawTwo + Wild + WildDrawFour))
+//            implies resolveAction[m1, m2, c, p] else moveNextPlayer[p, m1, m2]
+//       }
+//     }
+//   }
+//   gameOver
+// } for exactly 2 Player, exactly 19 Card, 4 Int, exactly 1 GameState, 6 Move for {next is linear}
 
 
 
