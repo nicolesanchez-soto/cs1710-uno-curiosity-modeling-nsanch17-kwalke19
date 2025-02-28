@@ -431,3 +431,4 @@ run {
   }
   gameOver
 } for exactly 2 Player, exactly 19 Card, 4 Int, exactly 1 GameState, 6 Move for {next is linear}
+
