@@ -80,7 +80,41 @@ If we had the capability to extend visualization, we would have created a **cust
 
 ### **Testing**  
 
-TODO
+**Testing Overview**
+
+The testing process for this Forge-based game model ensures that core game mechanics function as expected. Each test suite verifies a specific aspect of game behavior, including deck handling, player turns, card validity, action resolution, and game completion. The test cases systematically explore both valid and invalid game states to ensure constraints are properly enforced and to prevent unintended behavior.
+
+**Card Validity and Distribution**
+
+The `validCard` test suite ensures that only properly formed cards exist within the game. It verifies that regular cards have a color and value while wild cards lack a predefined color. Additionally, the `properNumberSpread` test checks that the deck contains the correct number of cards for each category (colors, values, and action types). By enforcing these constraints, we prevent under- or over-representation of specific card types and ensure the deck follows the intended distribution.
+
+**Deck and Hand Management**
+
+The `deal` test suite verifies that each player starts with exactly seven cards. This ensures compliance with initial game setup rules. The `drawCard` test suite evaluates whether drawing a card removes it from the deck and places it in a player's hand while keeping all other deck elements unchanged. The `addToHand` test confirms that cards can only be added from the deck and are removed from the deck afterward. Together, these tests maintain proper deck and hand state integrity.
+
+**Turn and Play Mechanics**
+
+The `playCard` test suite ensures that when a card is played, it moves from a player's hand to the discard pile, and the deck remains unchanged. It also verifies that special card actions (like wild cards) set appropriate game states. The `canPlayCard` test confirms that a card may only be played if it matches the top discard card’s color, value, or previously chosen wild card color.
+
+The `playerTurn` test suite verifies that players take valid actions during their turns. If a player has no playable cards, they must draw instead of attempting an illegal play. This suite also ensures that no player can pass their turn without taking an action. Additionally, tests were conducted to verify that illegal plays (e.g., playing a card that does not match the discard pile) are **properly rejected**, maintaining game integrity.
+
+**Action Resolution**
+
+The `resolveAction` test suite checks that special card effects (such as skipping a turn, drawing extra cards, or choosing a wild color) are correctly applied. It ensures that after an action is resolved, the pending action queue is cleared to allow the game to proceed. This includes verifying that:
+- Skip cards correctly prevent the next player from taking a turn.
+- Draw Two and Wild Draw Four cards force the opponent to draw the correct number of cards before proceeding.
+- Wild cards allow players to choose a valid new color.
+- Pending actions are properly cleared after they are resolved.
+
+The `skipAction` test confirms that skipping correctly advances the game state while preserving other elements. The `drawTwoAction` and `wildDrawFourAction` test suites validate that affected players receive the correct number of additional cards and that the turn flow remains intact.
+
+**Game Flow and Completion**
+
+The `moveNextPlayer` test suite ensures that turn order is correctly maintained, preventing multiple players from being active at once. The `skipOver` test validates that skip actions properly transition the turn to the next player. These tests confirm that turn sequencing is correctly enforced in both normal and action-card-affected scenarios.
+
+The `gameOver` test suite determines whether the game ends when a player has no cards left and no valid future moves exist. It prevents premature termination or continued play when a player should have won. Additionally, tests were performed to verify that the game does **not** falsely declare an end if a valid move remains.
+
+By ensuring these rules are rigorously tested, we maintain the integrity of the game model and prevent inconsistencies in gameplay logic. Furthermore, by testing both **valid and invalid states**, we ensure that constraints are properly enforced and that unintended behaviors do not arise during execution.
 
 ##### **What We Would Have Tested in a Full Model**
 - **Turn Reversals** (Reverse card logic).  
