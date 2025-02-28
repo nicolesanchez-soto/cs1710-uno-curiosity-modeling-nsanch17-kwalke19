@@ -1,14 +1,3 @@
-Curiosity
-
-Project Objective: What are you trying to model? Include a brief description that would give someone unfamiliar with the topic a basic understanding of your goal.
-
-
-Signatures and Predicates: At a high level, what do each of your sigs and preds represent in the context of the model? Justify the purpose for their existence and how they fit together.
-
-Testing: What tests did you write to test your model itself? What tests did you write to verify properties about your domain area? Feel free to give a high-level overview of this.
-
-
-
 ### **Curiosity**  
 
 #### **Project Objective**  

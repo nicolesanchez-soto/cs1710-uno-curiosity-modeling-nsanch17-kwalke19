@@ -39,6 +39,13 @@ pred drawChangesOneHand{
     }
 }
 
+// Deck not affected by play
+pred playRetainsDeck{
+    some m1, m2: Move | all c: Card | {
+        GameState.deck[m2][c] = GameState.deck[m1][c] 
+    }
+}
+
 pred initGameWellformed {
   some m0: Move | initGame[m0] implies (
     (no i: Int | some GameState.discard[m0][i])
@@ -627,3 +634,99 @@ test suite for drawCard {
     assert all p: Player, m1, m2: Move | {drawChangesOneHand} is necessary for drawCard[p, m1, m2]
 }
 
+test suite for playCard {
+    // all conditions correct
+    example goodPlayCard is {some m1, m2: Move | all p: Player | all c: Card | playCard[m1, m2, p, c]} for{
+        Card = `c0 
+        Color = `blue + `green + `red
+        Value = `zero + `onee + `two + `skip + `drawtwo + `wild + `wdf
+        Zero = `zero
+        One = `onee
+        Two = `two
+        Blue = `blue
+        Green = `green
+        Red = `red
+        Skip = `skip
+        DrawTwo = `drawtwo
+        Wild = `wild
+        WildDrawFour = `wdf
+        `c0.value = `wild
+
+        Player = `p0
+        GameState = `gs
+        Move = `m0 + `m1
+
+        Boolean = `True + `False
+        True = `True
+        False = `False
+
+        `gs.currentPlayer = (`m0, `p0) -> True
+        `gs.deck = (`m0, `c0) -> False + (`m1, `c0) -> False
+        `gs.hands = (`m0,`p0, `c0) -> True + (`m1, `p0, `c0) -> False
+        `gs.pendingAction = (`m1) -> `wild
+    }
+
+    // Wrong: card still in hand
+    example keepHandInPlayCard is not {some m1, m2: Move | all p: Player | all c: Card | playCard[m1, m2, p, c]} for{
+        Card = `c0 
+        Color = `blue + `green + `red
+        Value = `zero + `onee + `two + `skip + `drawtwo + `wild + `wdf
+        Zero = `zero
+        One = `onee
+        Two = `two
+        Blue = `blue
+        Green = `green
+        Red = `red
+        Skip = `skip
+        DrawTwo = `drawtwo
+        Wild = `wild
+        WildDrawFour = `wdf
+        `c0.value = `wild
+
+        Player = `p0
+        GameState = `gs
+        Move = `m0 + `m1
+
+        Boolean = `True + `False
+        True = `True
+        False = `False
+
+        `gs.currentPlayer = (`m0, `p0) -> True
+        `gs.deck = (`m0, `c0) -> False + (`m1, `c0) -> False
+        `gs.hands = (`m0,`p0, `c0) -> True + (`m1, `p0, `c0) -> True
+        `gs.pendingAction = (`m1) -> `wild
+    }
+
+    // Wrong: no pending action from playing special card
+    example pendingNotUpdated is not {some m1, m2: Move | all p: Player | all c: Card | playCard[m1, m2, p, c]} for{
+        Card = `c0 
+        Color = `blue + `green + `red
+        Value = `zero + `onee + `two + `skip + `drawtwo + `wild + `wdf
+        Zero = `zero
+        One = `onee
+        Two = `two
+        Blue = `blue
+        Green = `green
+        Red = `red
+        Skip = `skip
+        DrawTwo = `drawtwo
+        Wild = `wild
+        WildDrawFour = `wdf
+        `c0.value = `wild
+
+        Player = `p0
+        GameState = `gs
+        Move = `m0 + `m1
+
+        Boolean = `True + `False
+        True = `True
+        False = `False
+
+        `gs.currentPlayer = (`m0, `p0) -> True
+        `gs.deck = (`m0, `c0) -> False + (`m1, `c0) -> False
+        `gs.hands = (`m0,`p0, `c0) -> True + (`m1, `p0, `c0) -> True
+        no `gs.pendingAction
+    }
+
+    assert all m1, m2: Move, p: Player, c: Card | {playRetainsDeck} is necessary for playCard[m1,m2,p,c]
+}
